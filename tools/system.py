@@ -302,3 +302,49 @@ def run_shell_command(command: str) -> str:
         return "Error: Command timed out after 30 seconds."
     except Exception as e:
         return f"Shell execution failed: {e}"
+
+
+@tool(
+    description="Executes a PowerShell command/script with optional Windows Administrator (UAC) elevation for system-level control.",
+    risk_level=RiskLevel.DANGEROUS,
+)
+def run_admin_powershell(command: str, elevated: bool = False) -> str:
+    """Runs a PowerShell command, optionally requesting Administrator elevation."""
+    try:
+        if sys.platform != "win32":
+            proc = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=45)
+            out = (proc.stdout or "").strip()
+            err = (proc.stderr or "").strip()
+            return out if proc.returncode == 0 else f"Exit code {proc.returncode}:\n{err or out}"
+
+        if elevated:
+            # Escape single quotes for Start-Process ArgumentList
+            safe_cmd = command.replace('"', '\\"')
+            ps_launcher = [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                f'Start-Process powershell -Verb RunAs -Wait -ArgumentList \'-NoProfile -ExecutionPolicy Bypass -Command "{safe_cmd}"\'',
+            ]
+            proc = subprocess.run(ps_launcher, capture_output=True, text=True, timeout=60)
+            if proc.returncode != 0:
+                return f"Elevated PowerShell failed (exit {proc.returncode}): {(proc.stderr or proc.stdout).strip()}"
+            return "Elevated Administrator PowerShell command executed successfully."
+
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+        out = (proc.stdout or "").strip()
+        err = (proc.stderr or "").strip()
+        if proc.returncode != 0:
+            return f"Exit code {proc.returncode}:\n{err or out}"
+        return out if out else "PowerShell command executed successfully with no output."
+    except subprocess.TimeoutExpired:
+        return "Error: PowerShell command timed out."
+    except Exception as e:
+        return f"PowerShell execution failed: {e}"

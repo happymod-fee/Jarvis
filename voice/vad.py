@@ -9,7 +9,7 @@ import io
 import time
 import wave
 import logging
-from typing import Optional
+from typing import Optional, List
 import numpy as np
 
 logger = logging.getLogger("VAX.Voice.VAD")
@@ -43,15 +43,17 @@ class VoiceActivityDetector:
         max_duration_sec: float = 25.0,
         min_speech_sec: float = 0.35,
         onset_timeout_sec: Optional[float] = 10.0,
+        initial_frames: Optional[List[np.ndarray]] = None,
     ) -> Optional[bytes]:
         """
         Listens to recorder stream until the user finishes speaking.
         - onset_timeout_sec: maximum time to wait for speech to BEGIN before returning None.
         - silence_threshold_sec: how much continuous silence after speech ends the capture.
+        - initial_frames: optional pre-captured speech frames (e.g. from voice barge-in).
         Returns WAV bytes of the utterance, or None if no speech occurred.
         """
-        frames = []
-        speech_started = False
+        frames = list(initial_frames) if initial_frames else []
+        speech_started = bool(initial_frames)
         silence_start_time: Optional[float] = None
         start_time = time.time()
 

@@ -42,30 +42,35 @@
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start & Installation Guide
 
-### Step 1: Install Requirements
-Ensure Python 3.11+ is installed. Open PowerShell or Command Prompt:
+### Step 1: Clone from GitHub
+Ensure **Python 3.11+** and **Git** are installed, then run:
 
 ```bash
-cd "d:\CD\AI Video\vax"
+git clone https://github.com/happymod-fee/Jarvis.git
+cd Jarvis
+```
+
+### Step 2: Install Dependencies
+```bash
 python -m pip install -r requirements.txt
 ```
 
-### Step 2: Launch VAX
+### Step 3: Launch VAX / Jarvis
 To launch the full desktop GUI with the floating animated orb and system tray:
 
 ```bash
 python main.py
 ```
-*(Or double-click `run.bat`)*
+*(Or double-click `run.bat` on Windows / run `./run.sh` on Linux/macOS)*
 
 To run text-only CLI mode without voice or audio hardware:
 ```bash
 python main.py --cli
 ```
 
-### Step 3: First-Run Wizard
+### Step 4: First-Run Wizard
 On your first launch, VAX opens a 3-step setup wizard:
 1. **Paste your API key:** (e.g. your Groq or Gemini key). VAX auto-detects the provider and encrypts your key directly into the Windows Credential Store (DPAPI Keyring).
 2. **Choose Wake Word:** Default is `"hey jarvis"`.

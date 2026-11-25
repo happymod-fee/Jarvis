@@ -66,6 +66,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "mic_device_index": None,
         "mic_muted": False,
         "volume": 80,
+        "barge_in_enabled": True,
         "wake_sensitivity": 0.5,
         "beep_on_wake": True,
     },

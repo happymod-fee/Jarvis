@@ -67,6 +67,7 @@ class TextToSpeechEngine:
     """
     def __init__(self):
         self._is_speaking = False
+        self._playback_active = False
         self._stop_requested = False
         self._generation_id = 0
         self._lock = threading.RLock()
@@ -74,6 +75,9 @@ class TextToSpeechEngine:
 
     def is_speaking(self) -> bool:
         return self._is_speaking
+
+    def is_playback_active(self) -> bool:
+        return self._playback_active
 
     def set_volume(self, volume: float):
         """Set playback volume (0.0 – 1.0). Applies to next speech utterance."""
@@ -83,6 +87,7 @@ class TextToSpeechEngine:
     def _stop_playback_unlocked(self):
         """Stops active sounddevice output without acquiring lock."""
         self._stop_requested = True
+        self._playback_active = False
         try:
             sd.stop()
         except Exception:
@@ -223,7 +228,9 @@ class TextToSpeechEngine:
                 return
 
             if not mp3_bytes:
+                self._playback_active = True
                 self._speak_pyttsx3_fallback(text)
+                self._playback_active = False
                 return
 
             # 3. Decode MP3 and play via sounddevice
@@ -236,6 +243,7 @@ class TextToSpeechEngine:
             if self._stop_requested or gen_id != self._generation_id:
                 return
 
+            self._playback_active = True
             sd.play(data, samplerate)
             # Monitor playback for interruption with tight safety timeout
             audio_duration = len(data) / max(samplerate, 1)
@@ -259,6 +267,7 @@ class TextToSpeechEngine:
         except Exception as e:
             logger.error("TTS playback error: %s", e)
         finally:
+            self._playback_active = False
             should_notify = False
             with self._lock:
                 if gen_id == self._generation_id:

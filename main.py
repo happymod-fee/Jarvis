@@ -7,9 +7,11 @@ agent execution loop, and text-only CLI mode.
 import sys
 import os
 import time
+import types
 import asyncio
 import threading
 import logging
+import importlib.util
 from typing import Optional
 
 # Setup standard logging
@@ -20,10 +22,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VAX.Main")
 
-# Ensure vax package is in sys.path
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure vax package works regardless of whether repo folder is named 'vax' or 'Jarvis'
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(CURRENT_DIR)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
+if "vax" not in sys.modules:
+    try:
+        _vax_spec = importlib.util.find_spec("vax")
+    except ValueError:
+        _vax_spec = None
+    if _vax_spec is None:
+        import importlib.machinery
+        _vax_pkg = types.ModuleType("vax")
+        _vax_pkg.__path__ = [CURRENT_DIR]
+        _vax_pkg.__file__ = os.path.join(CURRENT_DIR, "__init__.py")
+        _vax_pkg.__spec__ = importlib.machinery.ModuleSpec("vax", None, is_package=True)
+        sys.modules["vax"] = _vax_pkg
 
 from vax.config import config_manager
 from vax.agent import AgentBrain
@@ -229,6 +244,65 @@ def run_gui_mode():
 
                 # Vocalize reply via TTS with follow-up or idle callback
                 tts_engine.speak(reply_str, on_complete=on_tts_finished)
+
+                # Hands-free Voice Barge-In monitor: interrupts VAX mid-speech if user starts speaking
+                if (
+                    bool(config_manager.get("voice", "barge_in_enabled", True))
+                    and recorder.is_available
+                    and not mini_win.is_mic_muted()
+                ):
+                    def barge_in_monitor():
+                        time.sleep(0.22)  # Avoid click/transient at start
+                        recorder.clear_queue()
+                        playback_started_at: Optional[float] = None
+                        echo_peak = 0.0
+                        consec_frames = 0
+                        pre_frames = []
+
+                        while tts_engine.is_speaking() and not _is_capturing.is_set() and not mini_win.is_mic_muted():
+                            chunk = recorder.read_frame(timeout=0.08)
+                            if chunk is None:
+                                continue
+
+                            energy = vad.compute_energy(chunk)
+                            is_playing = tts_engine.is_playback_active()
+
+                            if is_playing:
+                                now = time.time()
+                                if playback_started_at is None:
+                                    playback_started_at = now
+                                    echo_peak = 0.0
+                                    consec_frames = 0
+                                    pre_frames.clear()
+
+                                # First 0.30s of playback: calibrate speaker bleed into mic
+                                if now - playback_started_at < 0.30:
+                                    echo_peak = max(echo_peak, min(energy, 900.0))
+                                    continue
+
+                                thr = max(420.0, vad.noise_floor * 3.0, echo_peak * 1.65)
+                            else:
+                                # Still synthesizing (silent speaker) -> very responsive barge-in
+                                playback_started_at = None
+                                thr = max(230.0, vad.noise_floor * 2.2)
+
+                            if energy > thr:
+                                consec_frames += 1
+                                pre_frames.append(chunk)
+                                if consec_frames >= 3:
+                                    logger.info(
+                                        "Voice barge-in detected (energy=%.1f > thr=%.1f)! Interrupting TTS.",
+                                        energy,
+                                        thr,
+                                    )
+                                    tts_engine.stop()
+                                    on_voice_wake_triggered(is_followup=True, initial_frames=pre_frames)
+                                    return
+                            else:
+                                consec_frames = 0
+                                pre_frames.clear()
+
+                    threading.Thread(target=barge_in_monitor, daemon=True, name="BargeInMonitor").start()
             except Exception as top_err:
                 logger.error("Error in on_done callback: %s", top_err)
                 bridge.state_idle.emit()
@@ -238,7 +312,7 @@ def run_gui_mode():
     # Voice Activation Routine
     _is_capturing = threading.Event()
 
-    def on_voice_wake_triggered(is_followup: bool = False):
+    def on_voice_wake_triggered(is_followup: bool = False, initial_frames=None):
         if mini_win.is_mic_muted():
             logger.debug("Mic is muted; ignoring wake/PTT trigger.")
             return
@@ -247,7 +321,7 @@ def run_gui_mode():
             return
 
         # Allow instant interruption (barge-in) if user triggers PTT/Wake while TTS is playing
-        if not is_followup and tts_engine.is_speaking():
+        if tts_engine.is_speaking():
             tts_engine.stop()
 
         # If microphone was missing earlier, try auto-detecting again on PTT/Wake
@@ -277,12 +351,14 @@ def run_gui_mode():
 
         def capture_and_process():
             try:
-                time.sleep(0.10)
-                recorder.clear_queue()
+                if not initial_frames:
+                    time.sleep(0.10)
+                    recorder.clear_queue()
                 wav_data = vad.record_until_silence(
                     recorder,
                     max_duration_sec=25.0,
                     onset_timeout_sec=6.5 if is_followup else 10.0,
+                    initial_frames=initial_frames,
                 )
                 if not wav_data:
                     logger.info("No speech detected by VAD (%s).", "follow-up timeout" if is_followup else "wake")

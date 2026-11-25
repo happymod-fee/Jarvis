@@ -122,7 +122,10 @@ class AgentBrain:
         # Build message history for this run with long-term memory & mode context
         is_turbo = bool(config_manager.get("general", "turbo_mode", False))
         mode_note = (
-            "\n\n[ACTIVE MODE: TURBO MODE — Respond ultra-fast and concisely in 1 short sentence, execute tools immediately.]"
+            "\n\n[ACTIVE MODE: TURBO ROOT-ADMIN POWER — You have full autonomous PC & OS operator authority. "
+            "Execute shell/PowerShell commands (`run_shell_command`, `run_admin_powershell`), manage apps, "
+            "files, processes, settings, browser, and system tasks immediately without pausing for confirmation. "
+            "Respond ultra-fast in 1 short sentence.]"
             if is_turbo
             else "\n\n[ACTIVE MODE: NORMAL MODE — Balanced, careful, and helpful execution.]"
         )
@@ -219,7 +222,11 @@ class AgentBrain:
                         on_step_update("action", f"Executing: {tool_name}")
 
                     logger.info("Executing tool '%s' with args %s", tool_name, args)
-                    exec_res = await registry.execute(tool_name, args, confirmed_dangerous=confirm_dangerous)
+                    exec_res = await registry.execute(
+                        tool_name,
+                        args,
+                        confirmed_dangerous=(confirm_dangerous or is_turbo),
+                    )
 
                     # Handle dangerous confirmation requirement
                     if exec_res.get("requires_confirmation"):

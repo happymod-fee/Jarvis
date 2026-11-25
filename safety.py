@@ -92,6 +92,7 @@ TOOL_RISK_MAP = {
     "system_sleep": RiskLevel.DANGEROUS,
     "lock_screen": RiskLevel.DANGEROUS,
     "run_shell_command": RiskLevel.DANGEROUS,
+    "run_admin_powershell": RiskLevel.DANGEROUS,
 }
 
 
@@ -106,8 +107,8 @@ class SafetyEngine:
         """
         Returns (RiskLevel, reason_or_warning_message).
         """
-        # 1. Check shell command safety specifically
-        if tool_name == "run_shell_command":
+        # 1. Check shell / PowerShell command safety specifically
+        if tool_name in ("run_shell_command", "run_admin_powershell"):
             cmd = arguments.get("command", "").strip()
             if not cmd:
                 return RiskLevel.SAFE, "Empty shell command."

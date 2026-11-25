@@ -2,7 +2,7 @@
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR/.."
+cd "$DIR"
 
 echo "==================================================="
 echo "    VAX Voice Assistant (Unix Launcher)"
@@ -13,4 +13,4 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-python3 -m vax.main "$@"
+python3 main.py "$@"

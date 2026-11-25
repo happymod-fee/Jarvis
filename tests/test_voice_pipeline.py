@@ -55,3 +55,27 @@ def test_clean_text_for_speech_strips_emojis_and_markdown():
     assert "**" not in cleaned
     assert "Chrome" in cleaned
     assert "খুলেছি!" in cleaned
+
+
+def test_vad_preserves_barge_in_initial_frames():
+    speech_chunk = (np.ones(1280, dtype=np.int16) * 900)
+    silent_chunk = np.zeros(1280, dtype=np.int16)
+    pre_frames = [speech_chunk] * 3
+    rec = _FakeRecorder([speech_chunk] * 3 + [silent_chunk] * 26)
+    vad = VoiceActivityDetector(silence_threshold_sec=1.8)
+    wav = vad.record_until_silence(
+        rec,
+        max_duration_sec=10.0,
+        onset_timeout_sec=2.0,
+        initial_frames=pre_frames,
+    )
+    assert wav is not None
+    assert len(wav) > 12000
+
+
+def test_admin_powershell_safety_still_blocks_destructive():
+    from vax.safety import safety_engine, RiskLevel
+    risk, _ = safety_engine.evaluate("run_admin_powershell", {"command": "format C:"})
+    assert risk == RiskLevel.BLOCKED
+    risk_ok, _ = safety_engine.evaluate("run_admin_powershell", {"command": "Get-Process"})
+    assert risk_ok == RiskLevel.DANGEROUS
