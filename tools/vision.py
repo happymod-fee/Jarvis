@@ -43,8 +43,17 @@ def click_element_by_description(description: str) -> str:
     provider = config_manager.get("provider", "provider", "gemini").lower()
     api_key = get_api_key(provider)
 
+    # Vision requires multimodal model (Gemini/OpenAI/OpenRouter). Auto-fallback if primary doesn't support it.
+    if provider not in ("gemini", "openai", "openrouter") or not api_key:
+        for candidate in ("gemini", "openai", "openrouter"):
+            cand_key = get_api_key(candidate)
+            if cand_key:
+                provider = candidate
+                api_key = cand_key
+                break
+
     if not api_key:
-        return f"Cannot use vision locator: No API key configured for provider '{provider}'."
+        return "Cannot use vision locator: No multimodal API key (Gemini/OpenAI/OpenRouter) configured."
 
     prompt = (
         f"You are a computer UI vision locator. I need to click on: '{description}'.\n"

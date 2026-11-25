@@ -62,7 +62,7 @@ def web_search(query: str, max_results: int = 4) -> str:
         }
         data = {"q": query}
 
-        with httpx.Client(timeout=10.0) as client:
+        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
             res = client.post(url, data=data, headers=headers)
             if res.status_code != 200:
                 return f"Search service returned status {res.status_code}."
@@ -93,7 +93,7 @@ def get_weather(city: str = "") -> str:
     loc = urllib.parse.quote_plus(city.strip()) if city else ""
     url = f"https://wttr.in/{loc}?format=%l:+%C+%t+(feels+like+%f),+humidity:+%h,+wind:+%w"
     try:
-        with httpx.Client(timeout=8.0) as client:
+        with httpx.Client(timeout=8.0, follow_redirects=True) as client:
             res = client.get(url, headers={"User-Agent": "curl/7.68.0"})
             if res.status_code == 200:
                 return res.text.strip()

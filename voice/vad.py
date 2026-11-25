@@ -9,7 +9,7 @@ import io
 import time
 import wave
 import logging
-from typing import Optional, List
+from typing import Optional, List, Callable
 import numpy as np
 
 logger = logging.getLogger("VAX.Voice.VAD")
@@ -44,6 +44,7 @@ class VoiceActivityDetector:
         min_speech_sec: float = 0.35,
         onset_timeout_sec: Optional[float] = 10.0,
         initial_frames: Optional[List[np.ndarray]] = None,
+        on_energy_callback: Optional[Callable[[float], None]] = None,
     ) -> Optional[bytes]:
         """
         Listens to recorder stream until the user finishes speaking.
@@ -79,6 +80,12 @@ class VoiceActivityDetector:
                 continue
 
             energy = self.compute_energy(chunk)
+            if on_energy_callback is not None:
+                try:
+                    norm = min(1.0, max(0.0, (energy - self.noise_floor) / 1400.0))
+                    on_energy_callback(norm)
+                except Exception:
+                    pass
 
             # Adapt noise floor only before speech starts, capped to prevent echo spikes
             if not speech_started:

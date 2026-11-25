@@ -147,7 +147,8 @@ class SettingsDialog(QDialog):
         self.in_estop.setPlaceholderText("ctrl+alt+esc")
 
         self.chk_startup = QCheckBox("Start VAX automatically when Windows boots")
-        self.chk_turbo = QCheckBox("⚡ Enable Turbo Mode (ultra-fast responses & shorter speech pause)")
+        self.chk_turbo = QCheckBox("⚡ Enable Turbo Mode (Root-Admin execution & ultra-fast replies)")
+        self.chk_continuous = QCheckBox("💬 Continuous Conversation (auto-listen for follow-ups after VAX speaks)")
 
         layout.addRow("Wake Word Phrase:", self.in_wake_word)
         layout.addRow("Spoken Language Mode:", self.combo_lang)
@@ -155,6 +156,7 @@ class SettingsDialog(QDialog):
         layout.addRow("Emergency Stop Hotkey:", self.in_estop)
         layout.addRow("", self.chk_startup)
         layout.addRow("", self.chk_turbo)
+        layout.addRow("", self.chk_continuous)
 
     # --- TAB 2: AI PROVIDER ---
     def _setup_provider_tab(self):
@@ -476,14 +478,25 @@ class SettingsDialog(QDialog):
 
         self.combo_voice = QComboBox()
         self.combo_voice.addItems([
+            "auto (Smart Bangla + English Switching)",
             "bn-BD-NabanitaNeural (Bangla - Female)",
             "bn-BD-PradeepNeural (Bangla - Male)",
             "en-US-JennyNeural (English - Female)",
             "en-US-GuyNeural (English - Male)",
         ])
 
+        self.combo_tts_rate = QComboBox()
+        self.combo_tts_rate.addItems([
+            "+0% (Normal Speed)",
+            "+15% (Brisk)",
+            "+25% (Fast)",
+            "-10% (Calm / Clear)",
+        ])
+
         self.combo_mic = QComboBox()
         self._populate_mics()
+
+        self.chk_barge_in = QCheckBox("🎙️ Hands-free Voice Barge-In (speak anytime to interrupt VAX)")
 
         # Sensitivity slider with Qt.Orientation.Horizontal
         sens_layout = QHBoxLayout()
@@ -505,8 +518,10 @@ class SettingsDialog(QDialog):
         layout.addRow("STT Transcription Engine:", self.combo_stt)
         layout.addRow("TTS Synthesis Engine:", self.combo_tts)
         layout.addRow("Voice Persona:", self.combo_voice)
+        layout.addRow("Speaking Speed:", self.combo_tts_rate)
         layout.addRow("Microphone Input Device:", self.combo_mic)
         layout.addRow("Wake Word Sensitivity:", sens_layout)
+        layout.addRow("", self.chk_barge_in)
         layout.addRow("", test_voice_layout)
 
     def _populate_mics(self):
@@ -587,10 +602,16 @@ class SettingsDialog(QDialog):
     def _load_values(self):
         # General
         self.in_wake_word.setText(config_manager.get("general", "wake_word", "hey jarvis"))
+        saved_lang = config_manager.get("general", "language", "auto").lower()
+        for i in range(self.combo_lang.count()):
+            if saved_lang in self.combo_lang.itemText(i).lower():
+                self.combo_lang.setCurrentIndex(i)
+                break
         self.in_hotkey.setText(config_manager.get("general", "hotkey", "ctrl+space"))
         self.in_estop.setText(config_manager.get("general", "emergency_stop_hotkey", "ctrl+alt+esc"))
         self.chk_startup.setChecked(config_manager.get("general", "start_with_windows", False))
         self.chk_turbo.setChecked(config_manager.get("general", "turbo_mode", False))
+        self.chk_continuous.setChecked(config_manager.get("general", "continuous_conversation", True))
 
         # Provider
         current_p = config_manager.get("provider", "provider", "groq")
@@ -624,11 +645,30 @@ class SettingsDialog(QDialog):
                 self.combo_stt.setCurrentIndex(i)
                 break
 
+        tts_eng = config_manager.get("voice", "tts_engine", "edge-tts").lower()
+        for i in range(self.combo_tts.count()):
+            if tts_eng in self.combo_tts.itemText(i).lower():
+                self.combo_tts.setCurrentIndex(i)
+                break
+
         voice = config_manager.get("voice", "tts_voice", "bn-BD-NabanitaNeural")
         for i in range(self.combo_voice.count()):
             if voice in self.combo_voice.itemText(i):
                 self.combo_voice.setCurrentIndex(i)
                 break
+
+        rate_val = config_manager.get("voice", "tts_rate", "+0%")
+        for i in range(self.combo_tts_rate.count()):
+            if rate_val in self.combo_tts_rate.itemText(i):
+                self.combo_tts_rate.setCurrentIndex(i)
+                break
+
+        saved_mic = config_manager.get("voice", "mic_device_index")
+        mic_idx_pos = self.combo_mic.findData(saved_mic)
+        if mic_idx_pos >= 0:
+            self.combo_mic.setCurrentIndex(mic_idx_pos)
+
+        self.chk_barge_in.setChecked(config_manager.get("voice", "barge_in_enabled", True))
 
         sens = int(config_manager.get("voice", "wake_sensitivity", 0.5) * 100)
         self.slider_sens.setValue(sens)
@@ -644,10 +684,19 @@ class SettingsDialog(QDialog):
     def _on_save(self):
         # General
         config_manager.set("general", "wake_word", self.in_wake_word.text().strip().lower(), auto_save=False)
+        lang_choice = self.combo_lang.currentText().split()[0]
+        config_manager.set("general", "language", lang_choice, auto_save=False)
         config_manager.set("general", "hotkey", self.in_hotkey.text().strip().lower(), auto_save=False)
         config_manager.set("general", "emergency_stop_hotkey", self.in_estop.text().strip().lower(), auto_save=False)
-        config_manager.set("general", "start_with_windows", self.chk_startup.isChecked(), auto_save=False)
+        startup_enabled = self.chk_startup.isChecked()
+        config_manager.set("general", "start_with_windows", startup_enabled, auto_save=False)
+        try:
+            from vax.ui.tray import set_windows_startup
+            set_windows_startup(startup_enabled)
+        except Exception:
+            pass
         config_manager.set("general", "turbo_mode", self.chk_turbo.isChecked(), auto_save=False)
+        config_manager.set("general", "continuous_conversation", self.chk_continuous.isChecked(), auto_save=False)
 
         # Provider
         prov = self.combo_provider.currentText().lower()
@@ -673,8 +722,13 @@ class SettingsDialog(QDialog):
         # Voice
         stt_choice = self.combo_stt.currentText().split()[0]
         config_manager.set("voice", "stt_engine", stt_choice, auto_save=False)
+        tts_choice = self.combo_tts.currentText().split()[0]
+        config_manager.set("voice", "tts_engine", tts_choice, auto_save=False)
         voice_choice = self.combo_voice.currentText().split()[0]
         config_manager.set("voice", "tts_voice", voice_choice, auto_save=False)
+        rate_choice = self.combo_tts_rate.currentText().split()[0]
+        config_manager.set("voice", "tts_rate", rate_choice, auto_save=False)
+        config_manager.set("voice", "barge_in_enabled", self.chk_barge_in.isChecked(), auto_save=False)
         config_manager.set("voice", "wake_sensitivity", self.slider_sens.value() / 100.0, auto_save=False)
         mic_idx = self.combo_mic.currentData()
         config_manager.set("voice", "mic_device_index", mic_idx, auto_save=False)

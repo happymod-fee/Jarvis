@@ -58,29 +58,31 @@ class GeminiProvider(BaseLLMProvider):
         self.client = genai.Client(api_key=api_key)
 
     def fetch_models(self) -> List[str]:
-        """Queries the Google GenAI API for models supporting generateContent."""
+        """Queries the Google GenAI API for chat/tool-capable Gemini models."""
         try:
             results = []
             for m in self.client.models.list():
                 m_name = getattr(m, "name", "")
                 if m_name.startswith("models/"):
                     m_name = m_name[7:]
-                # Filter to text/chat capable models
                 actions = getattr(m, "supported_actions", []) or []
-                if "generateContent" in actions or "gemini" in m_name.lower():
+                if actions and "generateContent" not in actions:
+                    continue
+                low = m_name.lower()
+                if any(skip in low for skip in ("embedding", "imagen", "veo", "-tts", "bidi", "aqa")):
+                    continue
+                if m_name:
                     results.append(m_name)
 
             if results:
-                # Deduplicate and prioritize modern flash/pro models
-                sorted_models = sorted(
+                return sorted(
                     list(set(results)),
-                    key=lambda x: (not x.startswith("gemini-2"), not x.startswith("gemini-1.5"), x),
+                    key=lambda x: (not x.startswith("gemini-3"), not x.startswith("gemini-2"), x),
                 )
-                return sorted_models
         except Exception as e:
             logger.warning("Could not fetch Gemini models from API (%s); returning fallback list", e)
 
-        return FALLBACK_GEMINI_MODELS
+        return ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
 
     def _convert_messages(
         self,
@@ -288,23 +290,3 @@ class GeminiProvider(BaseLLMProvider):
             error_message=friendly_msg,
             provider_used="gemini",
         )
-
-    def fetch_models(self) -> List[str]:
-        """Fetches list of available models for this provider."""
-        try:
-            raw_models = self.client.models.list()
-            model_names = []
-            for m in raw_models:
-                name = getattr(m, "name", "")
-                if name.startswith("models/"):
-                    name = name[len("models/"):]
-                actions = getattr(m, "supported_actions", [])
-                if actions and "generateContent" not in actions:
-                    continue
-                if name and "embedding" not in name and "bidi" not in str(actions):
-                    model_names.append(name)
-            if model_names:
-                return sorted(model_names)
-        except Exception as e:
-            logger.warning("Failed to fetch models from Gemini: %s", e)
-        return ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]

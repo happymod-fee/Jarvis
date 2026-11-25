@@ -79,3 +79,20 @@ def test_admin_powershell_safety_still_blocks_destructive():
     assert risk == RiskLevel.BLOCKED
     risk_ok, _ = safety_engine.evaluate("run_admin_powershell", {"command": "Get-Process"})
     assert risk_ok == RiskLevel.DANGEROUS
+
+
+def test_vad_energy_callback_emits_normalized_levels():
+    speech_chunk = (np.ones(1280, dtype=np.int16) * 900)
+    silent_chunk = np.zeros(1280, dtype=np.int16)
+    levels = []
+    rec = _FakeRecorder([speech_chunk] * 5 + [silent_chunk] * 26)
+    vad = VoiceActivityDetector(silence_threshold_sec=1.8)
+    wav = vad.record_until_silence(
+        rec,
+        max_duration_sec=10.0,
+        onset_timeout_sec=2.0,
+        on_energy_callback=levels.append,
+    )
+    assert wav is not None
+    assert len(levels) > 0
+    assert all(0.0 <= lvl <= 1.0 for lvl in levels)

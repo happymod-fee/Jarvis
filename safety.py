@@ -98,10 +98,32 @@ TOOL_RISK_MAP = {
 
 class SafetyEngine:
     """
-    Evaluates requested tool executions against security policies.
+    Evaluates requested tool executions against security policies and user settings.
     """
-    def __init__(self, require_confirm_dangerous: bool = True):
-        self.require_confirm_dangerous = require_confirm_dangerous
+    BROWSER_TOOLS = {
+        "open_url", "search_google", "new_browser_tab", "switch_browser_tab",
+        "close_browser_tab", "click_browser_element", "fill_browser_form",
+        "read_page_text", "screenshot_page", "play_youtube_video", "control_youtube_media",
+    }
+    INPUT_TOOLS = {
+        "type_text", "press_key", "send_hotkey", "mouse_click", "mouse_move", "mouse_scroll",
+    }
+
+    def __init__(self, require_confirm_dangerous: Optional[bool] = None):
+        self._explicit_confirm = require_confirm_dangerous
+
+    def _get_safety_flag(self, key: str, default: bool = True) -> bool:
+        try:
+            from vax.config import config_manager
+            return bool(config_manager.get("safety", key, default))
+        except Exception:
+            return default
+
+    @property
+    def require_confirm_dangerous(self) -> bool:
+        if self._explicit_confirm is not None:
+            return self._explicit_confirm
+        return self._get_safety_flag("require_confirm_dangerous", True)
 
     def evaluate(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[RiskLevel, str]:
         """
@@ -129,6 +151,9 @@ class SafetyEngine:
                     "Blocked command: Attempt to inspect secret API keys or credentials.",
                 )
 
+            if not self._get_safety_flag("allow_shell_commands", True):
+                return RiskLevel.BLOCKED, "Shell command execution is disabled in Safety Settings."
+
             return (
                 RiskLevel.DANGEROUS if self.require_confirm_dangerous else RiskLevel.MEDIUM,
                 f"Executing shell command: `{cmd}`",
@@ -136,13 +161,22 @@ class SafetyEngine:
 
         # 2. Check deletion safety
         if tool_name in ("delete_file", "delete_folder"):
+            if not self._get_safety_flag("allow_file_deletion", True):
+                return RiskLevel.BLOCKED, "File/folder deletion is disabled in Safety Settings."
             target_path = arguments.get("path", "")
             return (
                 RiskLevel.DANGEROUS if self.require_confirm_dangerous else RiskLevel.MEDIUM,
                 f"Are you sure you want to move '{target_path}' to the Recycle Bin?",
             )
 
-        # 3. Check system power commands
+        # 3. Check browser / input toggles
+        if tool_name in self.BROWSER_TOOLS and not self._get_safety_flag("allow_browser_automation", True):
+            return RiskLevel.BLOCKED, "Browser automation is disabled in Safety Settings."
+
+        if tool_name in self.INPUT_TOOLS and not self._get_safety_flag("allow_keyboard_mouse", True):
+            return RiskLevel.BLOCKED, "Keyboard & mouse automation is disabled in Safety Settings."
+
+        # 4. Check system power commands
         if tool_name in ("system_shutdown", "system_restart"):
             action = "shut down" if tool_name == "system_shutdown" else "restart"
             return (

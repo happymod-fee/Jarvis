@@ -167,7 +167,7 @@ class AgentBrain:
             except Exception as e:
                 logger.error("Primary provider execution error: %s", e)
                 p_name = getattr(self.provider, "provider_name", "provider")
-                err_msg = format_friendly_error(e, p_name)
+                err_msg = format_friendly_error(p_name, e)
                 response = LLMResponse(content=err_msg, is_error=True, error_message=err_msg)
 
             # Check if primary failed and try fallback provider if configured
@@ -190,7 +190,7 @@ class AgentBrain:
                             response = fb_response
                     except Exception as fb_err:
                         logger.error("Fallback provider execution error: %s", fb_err)
-                        err_msg = format_friendly_error(fb_err, fb_name)
+                        err_msg = format_friendly_error(fb_name, fb_err)
                         response = LLMResponse(content=err_msg, is_error=True, error_message=err_msg)
 
             # If still error after retry and fallback, return friendly error message

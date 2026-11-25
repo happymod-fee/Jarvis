@@ -168,6 +168,7 @@ def run_gui_mode():
     class UISignalBridge(QObject):
         transcript_signal = Signal(str, str, str)  # sender, text, color
         mic_status_signal = Signal(bool, str)
+        audio_level_signal = Signal(float)
         state_listening = Signal()
         state_followup_listening = Signal()
         state_thinking = Signal(str)
@@ -177,6 +178,7 @@ def run_gui_mode():
     bridge = UISignalBridge()
     bridge.transcript_signal.connect(mini_win.append_transcript)
     bridge.mic_status_signal.connect(mini_win.set_microphone_status)
+    bridge.audio_level_signal.connect(mini_win.set_audio_level)
     bridge.state_listening.connect(lambda: mini_win.set_state_listening(is_followup=False))
     bridge.state_followup_listening.connect(lambda: mini_win.set_state_listening(is_followup=True))
     bridge.state_thinking.connect(mini_win.set_state_thinking)
@@ -359,6 +361,7 @@ def run_gui_mode():
                     max_duration_sec=25.0,
                     onset_timeout_sec=6.5 if is_followup else 10.0,
                     initial_frames=initial_frames,
+                    on_energy_callback=bridge.audio_level_signal.emit,
                 )
                 if not wav_data:
                     logger.info("No speech detected by VAD (%s).", "follow-up timeout" if is_followup else "wake")
@@ -489,6 +492,7 @@ def run_gui_mode():
         is_turbo = bool(config_manager.get("general", "turbo_mode", False))
         vad.silence_threshold_sec = 1.1 if is_turbo else 1.8
         mini_win.sync_turbo_ui(is_turbo)
+        mini_win.sync_followup_ui(bool(config_manager.get("general", "continuous_conversation", True)))
         if wake_engine is not None:
             wake_engine.update_config(
                 wake_word=config_manager.get("general", "wake_word", "hey jarvis"),
