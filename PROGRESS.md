@@ -1,0 +1,21 @@
+# 🚀 VAX Voice Assistant — Build Progress
+
+- [x] **Step 1:** Configuration & Credential Management (`config.py`) — *Completed & verified with DPAPI Keyring fallback.*
+- [x] **Step 2:** Provider Abstraction & Providers (`providers/base.py`, `openai_compatible.py`, `anthropic_provider.py`, `gemini_provider.py`) — *Completed with JSON fallback mode & provider auto-detection.*
+- [x] **Step 3:** Agent Brain, Memory & System Prompt (`agent.py`) — *Completed with multi-step tool reasoning & memory.*
+- [x] **Step 4:** Safety Layer & Action Logging (`safety.py`, `action_log.py`) — *Completed with destructive blocklists, confirmation tiers, & SQLite audit log.*
+- [x] **Step 5:** System & App Control Tools (`tools/system.py`) — *Completed with app launching, process termination, volume control, brightness, lock screen, & shutdown.*
+- [x] **Step 6:** Keyboard, Mouse & Vision Automation (`tools/keyboard_mouse.py`, `tools/vision.py`) — *Completed with typing, hotkeys, clicks, screenshots, & multimodal vision element finding.*
+- [x] **Step 7:** File Operations (`tools/files.py`) — *Completed with search, read, create, copy, move, zip/unzip, and safe delete to Windows Recycle Bin.*
+- [x] **Step 8:** Chrome Playwright Browser Control (`tools/browser.py`) — *Completed via Chrome Remote Debugging port 9222 preserving all user logins and sessions.*
+- [x] **Step 9:** Web Info, Productivity & Clipboard Tools (`tools/web_info.py`, `tools/clipboard.py`) — *Completed with DuckDuckGo search, wttr.in weather, safe AST calculator, Google translate, & clipboard.*
+- [x] **Step 10:** Audio Capture & VAD (`voice/recorder.py`, `voice/vad.py`) — *Completed with sounddevice 16kHz mono streaming & adaptive speech activity detection.*
+- [x] **Step 11:** Wake Word Engine & Push-to-Talk Hotkey (`voice/wake_word.py`) — *Completed with pre-trained openWakeWord 'hey jarvis' ONNX model & universal Ctrl+Space hotkey.*
+- [x] **Step 12:** STT & TTS Pipeline (`voice/stt.py`, `voice/tts.py`) — *Completed with Groq Whisper/faster-whisper STT & Edge-TTS bn-BD-NabanitaNeural Bangla voice acting.*
+- [x] **Step 13:** UI Styles, Animated Orb & Floating Mini Window (`ui/styles.py`, `ui/mini_window.py`, `ui/tray.py`) — *Completed with dark glassmorphism Qt6 HUD & 4-state animated orb.*
+- [x] **Step 14:** Settings Dashboard with 5 Tabs (`ui/settings/`) — *Completed with General, AI Provider, Voice, Safety, and Plugins tabs.*
+- [x] **Step 15:** First-Run Setup Wizard & Action Log Viewer (`ui/wizard.py`, `ui/log_viewer.py`) — *Completed 3-step onboarding wizard and SQLite log audit table.*
+- [x] **Step 16:** Plugin Architecture & Sample Plugin (`plugins/`) — *Completed dynamic auto-loader and sample Todo manager.*
+- [x] **Step 17:** Main Application Integration & CLI Mode (`main.py`) — *Completed async/GUI bridge and interactive terminal mode.*
+- [x] **Step 18:** Automated Test Suite & Documentation (`tests/`, `README.md`, `run.bat`) — *Completed with 14 passing automated tests & comprehensive docs.*
+- [x] **Step 19:** PyInstaller Packaging & Executable Validation (`build.spec`) — *Built standalone binary: dist\VAX_Voice_Assistant\VAX_Voice_Assistant.exe (36.4 MB).*

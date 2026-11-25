@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / Distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# Caches & Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local secrets & user data
+.env
+.env.*
+*.key
+.keys_vault
+.vax/
+*.log
